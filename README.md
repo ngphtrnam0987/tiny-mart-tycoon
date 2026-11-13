@@ -1,5 +1,10 @@
 # 🏪 Tiny Mart Tycoon
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://tiny-mart-tycoon.ngphtrnam0987.workers.dev/)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/ngphtrnam0987/tiny-mart-tycoon)
+
+🎮 **Play Online (Live Demo):** [https://tiny-mart-tycoon.ngphtrnam0987.workers.dev/](https://tiny-mart-tycoon.ngphtrnam0987.workers.dev/)
+
 An adorable, cozy 2D top-down shop management and idle tycoon simulator built with **React**, **TypeScript (strict)**, **Vite**, **Tailwind CSS v4**, **HTML5 Canvas 2D**, and **Zustand**.
 
 Start with a humble $200 startup fund, stock shelves with treats and drinks, serve eager neighborhood customers, hire friendly staff to automate operations, and scale your mini-mart into an autonomous supermarket empire!
@@ -121,13 +126,13 @@ Production output is compiled into the `dist/` directory.
 
 ---
 
-## ☁️ Deployment on Cloudflare Pages
+## ☁️ Deployment
 
-This project builds pure static assets compatible with Cloudflare Pages:
-
-1. **Build Command**: `npm run build`
-2. **Output Directory**: `dist`
-3. **Environment**: Node.js 18+
+- 🌐 **Live Web URL**: [https://tiny-mart-tycoon.ngphtrnam0987.workers.dev/](https://tiny-mart-tycoon.ngphtrnam0987.workers.dev/)
+- **Hosting Platform**: Cloudflare
+- **Framework Preset**: Vite
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
 
 ### Connecting via GitHub Git Integration (Recommended):
 1. In the Cloudflare dashboard, go to **Workers & Pages** ➔ **Create application** ➔ **Pages** ➔ **Connect to Git**.
