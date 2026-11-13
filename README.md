@@ -62,7 +62,7 @@ Start with a humble $200 startup fund, stock shelves with treats and drinks, ser
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/tiny-mart-tycoon.git
+git clone https://github.com/ngphtrnam0987/tiny-mart-tycoon.git
 
 # Navigate into the project folder
 cd tiny-mart-tycoon
