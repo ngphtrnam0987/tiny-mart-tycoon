@@ -18,9 +18,23 @@ Start with a humble $200 startup fund, stock shelves with treats and drinks, ser
   - Interactive mart shelves with dynamic visual stock meters and pulsing out-of-stock badges.
   - Animated customer sprites with distinct outfits, walking bob animations, and expressive thought bubbles.
   - Clickable register counter with electric speed-boost effects and floating financial text particles.
-- **Deep Customer AI**:
+  - Dynamic **Day/Night Ambient Lighting** with warm ceiling lamp reflections during dusk and evening hours.
+- **Deep Customer AI & VIPs**:
   - Full deterministic state machine: `ENTERING` ➔ `SHOPPING` ➔ `QUEUING` ➔ `PAYING` ➔ `LEAVING`.
   - Realistic waypoint movement, shopping list desires, shelf interaction, checkout queueing, and dissatisfaction handling.
+  - **VIP Royal Customers**: Spawn wearing golden crowns, leaving generous +150% cash tips upon checkout.
+  - **Express Shoppers**: Quick runners moving 40% faster for high turnover.
+- **Rush Hour Marketing Campaigns**:
+  - Activate the **Promo Rush Hour** to surge customer foot traffic by 300% for 30 seconds!
+- **Store Decor & Boutique Ambiance**:
+  - Install aesthetic decorations that provide active visual charm and passive bonuses:
+    - *Lush Monstera Pots*: +15% customer shopping patience.
+    - *Retro Soda Vending Machine*: Generates passive $4 every 30s.
+    - *Warm Amber Ceiling Lamps*: Illuminates evening aisles & boosts shopping speed +15%.
+    - *Barista Espresso Bar*: Raises staff morale & tips.
+    - *Cyberpunk Neon Sign*: Attracts +30% VIP customers.
+- **Daily Wholesale Deals & Trending Demand**:
+  - Real-time rotating market board with -40% supplier restock discounts and +50% hot trending retail sales.
 - **Three-Tier Staff Automation**:
   - **Alex (Cashier)**: Automates barcode scanning at the register. Each upgrade boosts checkout throughput.
   - **Sam (Stocker)**: Inspects shelf inventories and automatically restocks low shelves (<40%) using store cash.
@@ -36,7 +50,7 @@ Start with a humble $200 startup fund, stock shelves with treats and drinks, ser
 - **Robust Persistence & Versioning**:
   - Schema v1 with automated background saving, exportable/importable base64 save codes, and a safe reset modal.
 - **Extensive Test Coverage**:
-  - 30 unit tests using Vitest covering economy formulas, customer AI states, staff automation, offline progress, and save migration.
+  - 32 unit tests using Vitest covering economy formulas, customer AI states, staff automation, offline progress, and save migration.
 
 ---
 

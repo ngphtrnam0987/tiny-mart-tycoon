@@ -3,6 +3,7 @@ import {
   ShoppingBag,
   Users,
   Layers,
+  Sparkles,
   BarChart3,
   Award,
   Settings,
@@ -14,6 +15,7 @@ import { GameViewport } from './components/game/GameViewport';
 import { ProductsPanel } from './components/panels/ProductsPanel';
 import { StaffPanel } from './components/panels/StaffPanel';
 import { UpgradesPanel } from './components/panels/UpgradesPanel';
+import { DecorationsPanel } from './components/panels/DecorationsPanel';
 import { StatsPanel } from './components/panels/StatsPanel';
 import { AchievementsPanel } from './components/panels/AchievementsPanel';
 import { SettingsPanel } from './components/panels/SettingsPanel';
@@ -26,10 +28,12 @@ export function App() {
   const products = useGameStore((state) => state.products);
   const staff = useGameStore((state) => state.staff);
   const achievements = useGameStore((state) => state.achievements);
+  const decorations = useGameStore((state) => state.decorations);
 
   const emptyShelvesCount = products.filter((p) => p.isUnlocked && p.stock === 0).length;
   const hiredStaffCount = staff.filter((s) => s.hired).length;
   const unlockedAchCount = achievements.filter((a) => a.isUnlocked).length;
+  const purchasedDecorCount = decorations.filter((d) => d.isPurchased).length;
 
   const tabs: Array<{
     id: ManagementTab;
@@ -56,6 +60,13 @@ export function App() {
       id: 'upgrades',
       label: 'Upgrades',
       icon: <Layers className="w-4 h-4" />,
+    },
+    {
+      id: 'decorations',
+      label: 'Decor & Vibe',
+      icon: <Sparkles className="w-4 h-4" />,
+      badge: `${purchasedDecorCount}/${decorations.length}`,
+      badgeColor: 'bg-purple-100 text-purple-800',
     },
     {
       id: 'stats',
@@ -122,6 +133,7 @@ export function App() {
             {activeTab === 'products' && <ProductsPanel />}
             {activeTab === 'staff' && <StaffPanel />}
             {activeTab === 'upgrades' && <UpgradesPanel />}
+            {activeTab === 'decorations' && <DecorationsPanel />}
             {activeTab === 'stats' && <StatsPanel />}
             {activeTab === 'achievements' && <AchievementsPanel />}
             {activeTab === 'settings' && <SettingsPanel />}

@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useGameStore } from '../../store/useGameStore';
 import { renderGameWorld } from '../../game/rendering/canvasRenderer';
 import { SHELF_LOCATIONS, CHECKOUT_COUNTER } from '../../data/initialData';
-import { Zap } from 'lucide-react';
+import { Zap, Flame, Clock } from 'lucide-react';
 
 export const GameViewport: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -10,6 +10,10 @@ export const GameViewport: React.FC = () => {
 
   const tick = useGameStore((state) => state.tick);
   const products = useGameStore((state) => state.products);
+  const progression = useGameStore((state) => state.progression);
+  const rushHourTimeRemaining = useGameStore((state) => state.rushHourTimeRemaining);
+  const rushHourCooldown = useGameStore((state) => state.rushHourCooldown);
+  const activateRushHour = useGameStore((state) => state.activateRushHour);
   const manualRegisterClick = useGameStore((state) => state.manualRegisterClick);
   const buyProductStock = useGameStore((state) => state.buyProductStock);
   const setActiveTab = useGameStore((state) => state.setActiveTab);
@@ -31,16 +35,20 @@ export const GameViewport: React.FC = () => {
       if (canvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          const storeState = useGameStore.getState();
           renderGameWorld({
             ctx,
             width: canvas.width,
             height: canvas.height,
-            customers: useGameStore.getState().customers,
-            products: useGameStore.getState().products,
-            staff: useGameStore.getState().staff,
-            particles: useGameStore.getState().particles,
+            customers: storeState.customers,
+            products: storeState.products,
+            staff: storeState.staff,
+            decorations: storeState.decorations,
+            particles: storeState.particles,
             hoveredShelfId,
-            gameTime: useGameStore.getState().gameTime,
+            gameTime: storeState.gameTime,
+            timeOfDay: storeState.progression.timeOfDay,
+            isRushHour: storeState.rushHourTimeRemaining > 0,
           });
         }
       }
@@ -66,8 +74,16 @@ export const GameViewport: React.FC = () => {
     const clickX = (e.clientX - rect.left) * scaleX;
     const clickY = (e.clientY - rect.top) * scaleY;
 
+    // Check if clicked register area
     const distToRegister = Math.hypot(clickX - CHECKOUT_COUNTER.x, clickY - CHECKOUT_COUNTER.y);
     if (distToRegister < 65) {
+      manualRegisterClick();
+      return;
+    }
+
+    // Check if clicked vending machine (x: 485, y: 480)
+    const distToVending = Math.hypot(clickX - 485, clickY - 480);
+    if (distToVending < 30) {
       manualRegisterClick();
       return;
     }
@@ -117,22 +133,67 @@ export const GameViewport: React.FC = () => {
     setHoveredShelfId(foundShelf);
   };
 
+  const hours = Math.floor(progression.timeOfDay);
+  const minutes = Math.floor((progression.timeOfDay % 1) * 60);
+  const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${
+    hours >= 12 ? 'PM' : 'AM'
+  }`;
+
   return (
     <div className="relative w-full rounded-2xl overflow-hidden bg-white border-2 border-amber-200/80 shadow-md">
-      {/* Top Game Tip Banner */}
-      <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
-        <div className="flex items-center gap-1.5 bg-slate-900/75 backdrop-blur-md text-white text-[11px] font-medium px-3 py-1 rounded-full shadow-sm">
-          <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-          <span>Click shelves to restock &bull; Click checkout counter for Speed Boost!</span>
+      {/* Top Game Tip Banner & Dynamic Clock */}
+      <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10 gap-2">
+        <div className="flex items-center gap-2">
+          {/* In-game Clock */}
+          <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-sm">
+            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <span>
+              Day {progression.day} &bull; {formattedTime}
+            </span>
+          </div>
+
+          {/* Rush Hour Promo Indicator */}
+          {rushHourTimeRemaining > 0 && (
+            <div className="flex items-center gap-1 bg-gradient-to-r from-red-600 to-rose-600 text-white text-[11px] font-black px-3 py-1.5 rounded-full shadow-md animate-pulse">
+              <Flame className="w-3.5 h-3.5 fill-current" />
+              <span>RUSH HOUR: {Math.ceil(rushHourTimeRemaining)}s (3x Traffic)</span>
+            </div>
+          )}
         </div>
 
-        <button
-          onClick={manualRegisterClick}
-          className="pointer-events-auto bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1 transition-all"
-        >
-          <Zap className="w-3.5 h-3.5 fill-current" />
-          <span>Speed Boost Register</span>
-        </button>
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Rush hour campaign button */}
+          <button
+            onClick={activateRushHour}
+            disabled={rushHourTimeRemaining > 0 || rushHourCooldown > 0}
+            className={`text-xs font-black px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1 transition-all active:scale-95 ${
+              rushHourTimeRemaining > 0
+                ? 'bg-rose-500 text-white animate-pulse'
+                : rushHourCooldown > 0
+                ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                : 'bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white shadow-red-500/25'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 fill-current" />
+            <span>
+              {rushHourTimeRemaining > 0
+                ? 'Rush Active!'
+                : rushHourCooldown > 0
+                ? `Rush CD: ${Math.ceil(rushHourCooldown)}s`
+                : 'Promo Rush Hour'}
+            </span>
+          </button>
+
+          {/* Speed Boost Button */}
+          <button
+            onClick={manualRegisterClick}
+            className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1 transition-all"
+          >
+            <Zap className="w-3.5 h-3.5 fill-current" />
+            <span>Speed Boost Register</span>
+          </button>
+        </div>
       </div>
 
       {/* 2D Canvas */}

@@ -102,4 +102,37 @@ describe('Storage & Migration System', () => {
     expect(importSaveString('invalid-gibberish-string')).toBeNull();
     expect(importSaveString('')).toBeNull();
   });
+
+  it('preserves store decorations across save and load', () => {
+    const customDecorations = [
+      {
+        id: 'plant_entrance',
+        name: 'Monstera',
+        description: 'Cozy plant',
+        cost: 100,
+        isPurchased: true,
+        passiveBonus: '+15% Patience',
+        reqLevel: 1,
+        icon: 'Flower2',
+        x: 320,
+        y: 470,
+      },
+    ];
+
+    saveGame({
+      stats: INITIAL_STATS,
+      progression: INITIAL_PROGRESSION,
+      products: INITIAL_PRODUCTS,
+      staff: INITIAL_STAFF,
+      upgrades: INITIAL_UPGRADES,
+      achievements: INITIAL_ACHIEVEMENTS,
+      decorations: customDecorations,
+      hasCompletedTutorial: true,
+    });
+
+    const loaded = loadGame();
+    expect(loaded?.decorations).toBeDefined();
+    const plant = loaded?.decorations?.find((d) => d.id === 'plant_entrance');
+    expect(plant?.isPurchased).toBe(true);
+  });
 });

@@ -3,6 +3,7 @@ import type {
   ProductId,
   Product,
   CustomerAppearance,
+  CustomerType,
   FloatingParticle,
 } from '../../types/game';
 import {
@@ -18,17 +19,22 @@ const HAIR_COLORS = ['#78350f', '#1f2937', '#92400e', '#d97706', '#4b5563', '#fe
 
 let customerCounter = 1;
 
-export function generateRandomAppearance(): CustomerAppearance {
+export function generateRandomAppearance(isVip: boolean = false): CustomerAppearance {
   const bodyColor = BODY_COLORS[Math.floor(Math.random() * BODY_COLORS.length)];
-  const shirtColor = SHIRT_COLORS[Math.floor(Math.random() * SHIRT_COLORS.length)];
+  const shirtColor = isVip ? '#fbbf24' : SHIRT_COLORS[Math.floor(Math.random() * SHIRT_COLORS.length)];
   const hairColor = HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)];
-  const headwearOptions: Array<'cap' | 'glasses' | 'bow' | 'none'> = ['cap', 'glasses', 'bow', 'none', 'none'];
+  const headwearOptions: Array<'cap' | 'glasses' | 'bow' | 'crown' | 'none'> = isVip
+    ? ['crown', 'crown', 'glasses']
+    : ['cap', 'glasses', 'bow', 'none', 'none'];
   const headwear = headwearOptions[Math.floor(Math.random() * headwearOptions.length)];
 
   return { bodyColor, shirtColor, hairColor, headwear };
 }
 
-export function spawnCustomer(unlockedProducts: Product[]): Customer | null {
+export function spawnCustomer(
+  unlockedProducts: Product[],
+  vipBonusChance: number = 0
+): Customer | null {
   if (unlockedProducts.length === 0) return null;
 
   const randomProduct = unlockedProducts[Math.floor(Math.random() * unlockedProducts.length)];
@@ -37,12 +43,31 @@ export function spawnCustomer(unlockedProducts: Product[]): Customer | null {
   const targetY = shelf ? shelf.interactionY : 250;
 
   const id = `cust-${customerCounter++}`;
-  const names = ['Lily', 'Oliver', 'Emma', 'Noah', 'Mila', 'Leo', 'Ava', 'Lucas', 'Mia', 'Ethan', 'Chloe', 'Liam'];
+  const names = ['Lily', 'Oliver', 'Emma', 'Noah', 'Mila', 'Leo', 'Ava', 'Lucas', 'Mia', 'Ethan', 'Chloe', 'Liam', 'Sophia', 'James'];
   const name = names[Math.floor(Math.random() * names.length)];
+
+  const isVipRoll = Math.random() < 0.12 + vipBonusChance;
+  const isExpressRoll = !isVipRoll && Math.random() < 0.25;
+
+  let customerType: CustomerType = 'regular';
+  let speed = 1.6 + Math.random() * 0.4;
+  let tipBonus = 0;
+
+  if (isVipRoll) {
+    customerType = 'vip';
+    speed = 1.8;
+    tipBonus = Math.round(randomProduct.salePrice * 1.5); // VIP tips generous 150% extra!
+  } else if (isExpressRoll) {
+    customerType = 'express';
+    speed = 2.4;
+  }
 
   return {
     id,
     name,
+    customerType,
+    isVip: isVipRoll,
+    tipBonus,
     x: STORE_ENTRANCE.x + (Math.random() * 20 - 10),
     y: STORE_ENTRANCE.y,
     targetX,
@@ -52,21 +77,21 @@ export function spawnCustomer(unlockedProducts: Product[]): Customer | null {
     hasItem: false,
     shoppingProgress: 0,
     payingProgress: 0,
-    speed: 1.6 + Math.random() * 0.4,
-    appearance: generateRandomAppearance(),
+    speed,
+    appearance: generateRandomAppearance(isVipRoll),
     walkFrame: 0,
     frustrated: false,
     speechBubble: {
-      text: randomProduct.name.split(' ')[0],
+      text: isVipRoll ? `⭐ ${randomProduct.name.split(' ')[0]}` : randomProduct.name.split(' ')[0],
       icon: randomProduct.iconName,
-      type: 'need',
+      type: isVipRoll ? 'vip' : 'need',
       timer: 3.0,
     },
   };
 }
 
 export interface CustomerUpdateResult {
-  completedSales: Array<{ customerId: string; productId: ProductId }>;
+  completedSales: Array<{ customerId: string; productId: ProductId; isVip: boolean; tipBonus: number }>;
   walkedAway: number;
   particles: FloatingParticle[];
 }
@@ -76,7 +101,9 @@ export function updateCustomers(
   products: Product[],
   deltaSeconds: number,
   cashierEfficiencyMultiplier: number,
-  laserScannerBonus: number
+  laserScannerBonus: number,
+  hasMonsteraPlant: boolean = false,
+  hasLamps: boolean = false
 ): {
   updatedCustomers: Customer[];
   result: CustomerUpdateResult;
@@ -134,13 +161,16 @@ export function updateCustomers(
           cust.targetX = STORE_EXIT.x;
           cust.targetY = STORE_EXIT.y;
           cust.speechBubble = {
-            text: 'Sold out! :(',
+            text: cust.isVip ? 'VIP Out of Stock! 😡' : 'Sold out! :(',
             type: 'angry',
             timer: 2.0,
           };
           result.walkedAway += 1;
         } else {
-          const duration = Math.max(0.6, (prod.serviceDuration || 1200) / 1000);
+          // Speed boosted if warm ceiling lamps are installed
+          const lampSpeedBonus = hasLamps ? 1.2 : 1.0;
+          const patienceMultiplier = hasMonsteraPlant ? 1.25 : 1.0;
+          const duration = Math.max(0.5, ((prod.serviceDuration || 1200) / 1000) / (lampSpeedBonus * patienceMultiplier));
           cust.shoppingProgress += deltaSeconds / duration;
 
           if (cust.shoppingProgress >= 1.0) {
@@ -149,8 +179,8 @@ export function updateCustomers(
               cust.hasItem = true;
               cust.state = 'QUEUING';
               cust.speechBubble = {
-                text: 'Got it! :)',
-                type: 'happy',
+                text: cust.isVip ? 'Got VIP Treat! ✨' : 'Got it! :)',
+                type: cust.isVip ? 'vip' : 'happy',
                 timer: 1.5,
               };
             } else {
@@ -183,35 +213,39 @@ export function updateCustomers(
 
       case 'PAYING': {
         const checkoutSpeedMultiplier = 1.0 + laserScannerBonus + cashierEfficiencyMultiplier;
-        const baseDuration = 1.2;
+        const baseDuration = cust.isVip ? 1.4 : 1.2;
         cust.payingProgress += (deltaSeconds * checkoutSpeedMultiplier) / baseDuration;
 
         if (cust.payingProgress >= 1.0) {
           result.completedSales.push({
             customerId: cust.id,
             productId: cust.desiredProduct,
+            isVip: cust.isVip,
+            tipBonus: cust.tipBonus,
           });
 
           cust.state = 'LEAVING';
           cust.targetX = STORE_EXIT.x;
           cust.targetY = STORE_EXIT.y;
           cust.speechBubble = {
-            text: 'Thank you!',
-            type: 'happy',
-            timer: 2.0,
+            text: cust.isVip ? `⭐ +$${cust.tipBonus} TIP!` : 'Thank you!',
+            type: cust.isVip ? 'vip' : 'happy',
+            timer: 2.2,
           };
 
           const prod = productMap.get(cust.desiredProduct);
           const saleVal = prod ? prod.salePrice : 6;
+          const totalEarned = saleVal + cust.tipBonus;
+
           result.particles.push({
             id: `p-${Date.now()}-${Math.random()}`,
             x: cust.x,
             y: cust.y - 20,
-            text: `+$${saleVal}`,
-            color: '#10b981',
+            text: cust.isVip ? `👑 +$${totalEarned} (VIP)` : `+$${saleVal}`,
+            color: cust.isVip ? '#fbbf24' : '#10b981',
             opacity: 1.0,
             vy: -35,
-            life: 1.2,
+            life: 1.4,
           });
         }
         break;

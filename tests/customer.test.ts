@@ -85,4 +85,20 @@ describe('Customer AI State Machine', () => {
     expect(updatedCustomers[0].state).toBe('LEAVING');
     expect(result.particles.length).toBe(1);
   });
+
+  it('spawns and processes VIP customer with bonus tips', () => {
+    // Force VIP bonus chance = 1.0
+    const vipCustomer = spawnCustomer(testProducts, 1.0)!;
+    expect(vipCustomer.isVip).toBe(true);
+    expect(vipCustomer.customerType).toBe('vip');
+    expect(vipCustomer.tipBonus).toBeGreaterThan(0);
+
+    vipCustomer.state = 'PAYING';
+    vipCustomer.payingProgress = 0.95;
+
+    const { result } = updateCustomers([vipCustomer], testProducts, 0.5, 1.0, 0);
+    expect(result.completedSales.length).toBe(1);
+    expect(result.completedSales[0].isVip).toBe(true);
+    expect(result.completedSales[0].tipBonus).toBe(vipCustomer.tipBonus);
+  });
 });

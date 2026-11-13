@@ -6,6 +6,7 @@ import type {
   StaffMember,
   Upgrade,
   Achievement,
+  StoreDecoration,
 } from '../types/game';
 import {
   INITIAL_STATS,
@@ -14,6 +15,7 @@ import {
   INITIAL_STAFF,
   INITIAL_UPGRADES,
   INITIAL_ACHIEVEMENTS,
+  INITIAL_DECORATIONS,
 } from '../data/initialData';
 
 const SAVE_KEY = 'TINY_MART_TYCOON_SAVE_V1';
@@ -29,6 +31,7 @@ export function saveGame(saveData: Omit<GameSaveSchemaV1, 'version' | 'timestamp
       staff: saveData.staff,
       upgrades: saveData.upgrades,
       achievements: saveData.achievements,
+      decorations: saveData.decorations || INITIAL_DECORATIONS,
       hasCompletedTutorial: saveData.hasCompletedTutorial,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(fullSave));
@@ -56,6 +59,7 @@ export function loadGame(): GameSaveSchemaV1 | null {
         staff: mergeStaff(parsed.staff),
         upgrades: mergeUpgrades(parsed.upgrades),
         achievements: mergeAchievements(parsed.achievements),
+        decorations: mergeDecorations(parsed.decorations),
         hasCompletedTutorial: Boolean(parsed.hasCompletedTutorial),
       };
     }
@@ -92,6 +96,7 @@ export function importSaveString(encoded: string): GameSaveSchemaV1 | null {
         staff: mergeStaff(parsed.staff),
         upgrades: mergeUpgrades(parsed.upgrades),
         achievements: mergeAchievements(parsed.achievements),
+        decorations: mergeDecorations(parsed.decorations),
         hasCompletedTutorial: Boolean(parsed.hasCompletedTutorial),
       };
     }
@@ -120,6 +125,8 @@ function sanitizeStats(stats: Partial<FinancialStats> | undefined): FinancialSta
     netProfit: sanitizeNumber(stats.netProfit, 0),
     customersServed: Math.max(0, Math.floor(sanitizeNumber(stats.customersServed, 0))),
     customersWalkedAway: Math.max(0, Math.floor(sanitizeNumber(stats.customersWalkedAway, 0))),
+    vipCustomersServed: Math.max(0, Math.floor(sanitizeNumber(stats.vipCustomersServed, 0))),
+    totalTipsEarned: Math.max(0, Math.floor(sanitizeNumber(stats.totalTipsEarned, 0))),
     itemsSold: {
       ...INITIAL_STATS.itemsSold,
       ...(stats.itemsSold || {}),
@@ -135,9 +142,10 @@ function sanitizeProgression(prog: Partial<StoreProgression> | undefined): Store
     xp: Math.max(0, sanitizeNumber(prog.xp, 0)),
     xpToNextLevel: Math.max(50, sanitizeNumber(prog.xpToNextLevel, 100)),
     day: Math.max(1, Math.floor(sanitizeNumber(prog.day, 1))),
-    timeOfDay: Math.min(24, Math.max(0, sanitizeNumber(prog.timeOfDay, 8.0))),
+    timeOfDay: Math.min(24, Math.max(0, sanitizeNumber(prog.timeOfDay, 9.0))),
     isPaused: false,
     gameSpeed: 1,
+    prestigeStars: Math.max(0, Math.floor(sanitizeNumber(prog.prestigeStars, 0))),
   };
 }
 
@@ -191,6 +199,18 @@ function mergeAchievements(savedAchievements: Achievement[] | undefined): Achiev
       ...initAch,
       isUnlocked: Boolean(saved.isUnlocked),
       progress: Math.min(initAch.maxProgress, Math.max(0, sanitizeNumber(saved.progress, 0))),
+    };
+  });
+}
+
+function mergeDecorations(savedDecorations: StoreDecoration[] | undefined): StoreDecoration[] {
+  if (!Array.isArray(savedDecorations)) return INITIAL_DECORATIONS;
+  return INITIAL_DECORATIONS.map((initDec) => {
+    const saved = savedDecorations.find((d) => d.id === initDec.id);
+    if (!saved) return initDec;
+    return {
+      ...initDec,
+      isPurchased: Boolean(saved.isPurchased),
     };
   });
 }

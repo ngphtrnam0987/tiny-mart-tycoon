@@ -7,6 +7,7 @@ import type {
   StoreProgression,
   ShelfLocation,
   CheckoutCounter,
+  StoreDecoration,
 } from '../types/game';
 
 export const INITIAL_PRODUCTS: Product[] = [
@@ -234,6 +235,69 @@ export const INITIAL_UPGRADES: Upgrade[] = [
   },
 ];
 
+export const INITIAL_DECORATIONS: StoreDecoration[] = [
+  {
+    id: 'plant_entrance',
+    name: 'Lush Monstera Pots',
+    description: 'Cozy indoor plants that relax shoppers, increasing customer patience before leaving.',
+    cost: 120,
+    isPurchased: false,
+    passiveBonus: '+15% Customer Patience',
+    reqLevel: 1,
+    icon: 'Flower2',
+    x: 325,
+    y: 475,
+  },
+  {
+    id: 'vending_machine',
+    name: 'Retro Soda Machine',
+    description: 'Classic arcade soda dispenser placing coins in your pocket every minute!',
+    cost: 260,
+    isPurchased: false,
+    passiveBonus: 'Passive +$4 every 30s',
+    reqLevel: 2,
+    icon: 'Milk',
+    x: 485,
+    y: 480,
+  },
+  {
+    id: 'ceiling_chandeliers',
+    name: 'Warm Amber Lamps',
+    description: 'Hanging ceiling pendants illuminating aisles with warm ambient glow.',
+    cost: 320,
+    isPurchased: false,
+    passiveBonus: '+15% Shopping Speed',
+    reqLevel: 2,
+    icon: 'SunMedium',
+    x: 550,
+    y: 200,
+  },
+  {
+    id: 'espresso_counter',
+    name: 'Barista Espresso Bar',
+    description: 'A cozy coffee nook for staff and VIPs that raises employee morale and tip rate.',
+    cost: 500,
+    isPurchased: false,
+    passiveBonus: '+25% Staff Speed & Tips',
+    reqLevel: 3,
+    icon: 'Coffee',
+    x: 80,
+    y: 200,
+  },
+  {
+    id: 'neon_mart_sign',
+    name: 'Cyberpunk Neon Sign',
+    description: 'Vibrant custom neon logo casting gorgeous reflections during evening hours.',
+    cost: 650,
+    isPurchased: false,
+    passiveBonus: '+30% VIP Customer Spawns',
+    reqLevel: 3,
+    icon: 'Sparkles',
+    x: 400,
+    y: 55,
+  },
+];
+
 export const INITIAL_ACHIEVEMENTS: Achievement[] = [
   {
     id: 'first_sale',
@@ -305,6 +369,26 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     progress: 0,
     maxProgress: 3,
   },
+  {
+    id: 'vip_regular',
+    title: 'Royal Treatment',
+    description: 'Serve 5 VIP customers with golden service.',
+    rewardCash: 350,
+    rewardXp: 400,
+    isUnlocked: false,
+    progress: 0,
+    maxProgress: 5,
+  },
+  {
+    id: 'interior_decorator',
+    title: 'Cozy Boutique',
+    description: 'Purchase at least 2 store decorations.',
+    rewardCash: 250,
+    rewardXp: 300,
+    isUnlocked: false,
+    progress: 0,
+    maxProgress: 2,
+  },
 ];
 
 export const INITIAL_STATS: FinancialStats = {
@@ -316,6 +400,8 @@ export const INITIAL_STATS: FinancialStats = {
   netProfit: 0,
   customersServed: 0,
   customersWalkedAway: 0,
+  vipCustomersServed: 0,
+  totalTipsEarned: 0,
   itemsSold: {
     snacks: 0,
     drinks: 0,
@@ -332,9 +418,10 @@ export const INITIAL_PROGRESSION: StoreProgression = {
   xp: 0,
   xpToNextLevel: 100,
   day: 1,
-  timeOfDay: 8.0,
+  timeOfDay: 9.0, // 9:00 AM
   isPaused: false,
   gameSpeed: 1,
+  prestigeStars: 0,
 };
 
 export const STORE_ENTRANCE = { x: 400, y: 510 };

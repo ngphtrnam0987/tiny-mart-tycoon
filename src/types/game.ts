@@ -8,7 +8,7 @@ export interface Product {
   salePrice: number;
   stock: number;
   maxCapacity: number;
-  serviceDuration: number; // ms to pick item
+  serviceDuration: number;
   isUnlocked: boolean;
   unlockCost: number;
   unlockStoreLevel: number;
@@ -28,7 +28,7 @@ export interface StaffMember {
   hiringCost: number;
   baseSalaryPerMin: number;
   upgradeCost: number;
-  workSpeed: number; // multiplier or speed factor
+  workSpeed: number;
   active: boolean;
   avatarColor: string;
 }
@@ -44,29 +44,33 @@ export interface Upgrade {
   maxLevel: number;
   baseCost: number;
   costMultiplier: number;
-  effectValue: number; // per level effect (e.g. +10% or +10 capacity)
+  effectValue: number;
   reqStoreLevel: number;
 }
 
+export type CustomerType = 'regular' | 'vip' | 'express';
 export type CustomerState = 'ENTERING' | 'SHOPPING' | 'QUEUING' | 'PAYING' | 'LEAVING';
 
 export interface CustomerAppearance {
   bodyColor: string;
   shirtColor: string;
   hairColor: string;
-  headwear?: 'cap' | 'glasses' | 'bow' | 'none';
+  headwear?: 'cap' | 'glasses' | 'bow' | 'crown' | 'none';
 }
 
 export interface SpeechBubble {
   text: string;
   icon?: string;
-  type: 'need' | 'happy' | 'angry' | 'money';
+  type: 'need' | 'happy' | 'angry' | 'money' | 'vip';
   timer: number;
 }
 
 export interface Customer {
   id: string;
   name: string;
+  customerType: CustomerType;
+  isVip: boolean;
+  tipBonus: number;
   x: number;
   y: number;
   targetX: number;
@@ -74,8 +78,8 @@ export interface Customer {
   state: CustomerState;
   desiredProduct: ProductId;
   hasItem: boolean;
-  shoppingProgress: number; // 0 to 1
-  payingProgress: number; // 0 to 1
+  shoppingProgress: number;
+  payingProgress: number;
   speed: number;
   appearance: CustomerAppearance;
   speechBubble?: SpeechBubble;
@@ -104,13 +108,15 @@ export interface ShelfLocation {
 export interface FinancialStats {
   cash: number;
   totalRevenue: number;
-  totalCogs: number; // Cost of Goods Sold
+  totalCogs: number;
   totalSalaries: number;
   totalUpgrades: number;
   netProfit: number;
   customersServed: number;
   customersWalkedAway: number;
   itemsSold: Record<ProductId, number>;
+  vipCustomersServed?: number;
+  totalTipsEarned?: number;
 }
 
 export interface StoreProgression {
@@ -119,9 +125,10 @@ export interface StoreProgression {
   xp: number;
   xpToNextLevel: number;
   day: number;
-  timeOfDay: number; // 0 to 24 in-game hours
+  timeOfDay: number; // 8.0 to 22.0 in-game hours
   isPaused: boolean;
-  gameSpeed: number; // 1, 2, 5
+  gameSpeed: number;
+  prestigeStars?: number;
 }
 
 export interface Achievement {
@@ -155,6 +162,25 @@ export interface OfflineSummary {
   netProfit: number;
 }
 
+export interface StoreDecoration {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+  isPurchased: boolean;
+  passiveBonus: string;
+  reqLevel: number;
+  icon: string;
+  x: number;
+  y: number;
+}
+
+export interface DailyMarketDeal {
+  discountedProductId: ProductId; // -40% wholesale cost
+  trendingProductId: ProductId;   // +50% retail price
+  expiresInSeconds: number;
+}
+
 export interface GameSaveSchemaV1 {
   version: 1;
   timestamp: number;
@@ -164,5 +190,6 @@ export interface GameSaveSchemaV1 {
   staff: StaffMember[];
   upgrades: Upgrade[];
   achievements: Achievement[];
+  decorations?: StoreDecoration[];
   hasCompletedTutorial: boolean;
 }

@@ -11,12 +11,15 @@ import type {
   FloatingParticle,
   OfflineSummary,
   ProductId,
+  StoreDecoration,
+  DailyMarketDeal,
 } from '../types/game';
 import {
   INITIAL_PRODUCTS,
   INITIAL_STAFF,
   INITIAL_UPGRADES,
   INITIAL_ACHIEVEMENTS,
+  INITIAL_DECORATIONS,
   INITIAL_STATS,
   INITIAL_PROGRESSION,
 } from '../data/initialData';
@@ -48,7 +51,14 @@ import {
 } from '../utils/storage';
 import { soundManager } from '../utils/audio';
 
-export type ManagementTab = 'products' | 'staff' | 'upgrades' | 'stats' | 'achievements' | 'settings';
+export type ManagementTab =
+  | 'products'
+  | 'staff'
+  | 'upgrades'
+  | 'decorations'
+  | 'stats'
+  | 'achievements'
+  | 'settings';
 
 interface GameState {
   stats: FinancialStats;
@@ -57,8 +67,13 @@ interface GameState {
   staff: StaffMember[];
   upgrades: Upgrade[];
   achievements: Achievement[];
+  decorations: StoreDecoration[];
   customers: Customer[];
   particles: FloatingParticle[];
+
+  dailyDeal: DailyMarketDeal;
+  rushHourTimeRemaining: number;
+  rushHourCooldown: number;
 
   activeTab: ManagementTab;
   isMuted: boolean;
@@ -68,6 +83,7 @@ interface GameState {
   hasCompletedTutorial: boolean;
   salaryTimer: number;
   stockerTimer: number;
+  vendingTimer: number;
   spawnTimer: number;
   gameTime: number;
 
@@ -77,6 +93,8 @@ interface GameState {
   hireStaff: (staffId: string) => boolean;
   upgradeStaff: (staffId: string) => boolean;
   buyUpgrade: (upgradeId: string) => boolean;
+  buyDecoration: (decorationId: string) => boolean;
+  activateRushHour: () => boolean;
   manualRegisterClick: () => void;
   setActiveTab: (tab: ManagementTab) => void;
   setGameSpeed: (speed: number) => void;
@@ -97,6 +115,7 @@ function initGame(): {
   staff: StaffMember[];
   upgrades: Upgrade[];
   achievements: Achievement[];
+  decorations: StoreDecoration[];
   offlineSummary: OfflineSummary | null;
   hasCompletedTutorial: boolean;
 } {
@@ -118,6 +137,7 @@ function initGame(): {
       staff: saved.staff,
       upgrades: saved.upgrades,
       achievements: saved.achievements,
+      decorations: saved.decorations || INITIAL_DECORATIONS.map((d) => ({ ...d })),
       offlineSummary: offlineResult.summary,
       hasCompletedTutorial: saved.hasCompletedTutorial,
     };
@@ -130,6 +150,7 @@ function initGame(): {
     staff: INITIAL_STAFF.map((s) => ({ ...s })),
     upgrades: INITIAL_UPGRADES.map((u) => ({ ...u })),
     achievements: INITIAL_ACHIEVEMENTS.map((a) => ({ ...a })),
+    decorations: INITIAL_DECORATIONS.map((d) => ({ ...d })),
     offlineSummary: null,
     hasCompletedTutorial: false,
   };
@@ -144,8 +165,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   staff: initial.staff,
   upgrades: initial.upgrades,
   achievements: initial.achievements,
+  decorations: initial.decorations,
   customers: [],
   particles: [],
+
+  dailyDeal: {
+    discountedProductId: 'snacks',
+    trendingProductId: 'drinks',
+    expiresInSeconds: 180,
+  },
+  rushHourTimeRemaining: 0,
+  rushHourCooldown: 0,
 
   activeTab: 'products',
   isMuted: false,
@@ -155,6 +185,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   hasCompletedTutorial: initial.hasCompletedTutorial,
   salaryTimer: 60,
   stockerTimer: 3,
+  vendingTimer: 30,
   spawnTimer: 1.5,
   gameTime: 0,
 
@@ -163,12 +194,53 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (state.progression.isPaused) return;
 
     const effectiveDelta = deltaSeconds * state.progression.gameSpeed;
-    let { stats, progression, products, staff, upgrades, achievements, customers, particles } =
-      state;
-    let { salaryTimer, stockerTimer, spawnTimer, gameTime } = state;
+    let {
+      stats,
+      progression,
+      products,
+      staff,
+      upgrades,
+      achievements,
+      decorations,
+      customers,
+      particles,
+      dailyDeal,
+      rushHourTimeRemaining,
+      rushHourCooldown,
+    } = state;
+    let { salaryTimer, stockerTimer, vendingTimer, spawnTimer, gameTime } = state;
 
     gameTime += effectiveDelta;
 
+    // Time of Day progression (8am to 22pm, 1 in-game hour = 25 real seconds)
+    let newTimeOfDay = progression.timeOfDay + effectiveDelta / 25;
+    let newDay = progression.day;
+    if (newTimeOfDay >= 22.0) {
+      newTimeOfDay = 8.0;
+      newDay += 1;
+      // Rotate Daily Deals
+      const unlockedIds = products.filter((p) => p.isUnlocked).map((p) => p.id);
+      if (unlockedIds.length > 0) {
+        const discIndex = Math.floor(Math.random() * unlockedIds.length);
+        const trendIndex = (discIndex + 1) % unlockedIds.length;
+        dailyDeal = {
+          discountedProductId: unlockedIds[discIndex],
+          trendingProductId: unlockedIds[trendIndex],
+          expiresInSeconds: 180,
+        };
+      }
+    }
+    progression = { ...progression, timeOfDay: newTimeOfDay, day: newDay };
+
+    // Rush hour timers
+    if (rushHourTimeRemaining > 0) {
+      rushHourTimeRemaining = Math.max(0, rushHourTimeRemaining - effectiveDelta);
+    }
+    if (rushHourCooldown > 0) {
+      rushHourCooldown = Math.max(0, rushHourCooldown - effectiveDelta);
+    }
+
+    // Upgrades & Decorations impact
     const attractionUpgrade = upgrades.find((u) => u.id === 'customer_attraction');
     const attractionLevel = attractionUpgrade ? attractionUpgrade.level : 0;
     const scannerUpgrade = upgrades.find((u) => u.id === 'checkout_speed');
@@ -180,29 +252,69 @@ export const useGameStore = create<GameState>((set, get) => ({
     const wholesaleUpgrade = upgrades.find((u) => u.id === 'profit_optimization');
     const wholesaleLevel = wholesaleUpgrade ? wholesaleUpgrade.level : 0;
 
+    const hasMonstera = decorations.some((d) => d.id === 'plant_entrance' && d.isPurchased);
+    const hasLamps = decorations.some((d) => d.id === 'ceiling_chandeliers' && d.isPurchased);
+    const hasEspresso = decorations.some((d) => d.id === 'espresso_counter' && d.isPurchased);
+    const hasNeon = decorations.some((d) => d.id === 'neon_mart_sign' && d.isPurchased);
+    const hasVending = decorations.some((d) => d.id === 'vending_machine' && d.isPurchased);
+
+    // Passive Vending Machine Revenue
+    if (hasVending) {
+      vendingTimer -= effectiveDelta;
+      if (vendingTimer <= 0) {
+        const vendingIncome = 4;
+        stats = {
+          ...stats,
+          cash: stats.cash + vendingIncome,
+          totalRevenue: stats.totalRevenue + vendingIncome,
+          netProfit: stats.netProfit + vendingIncome,
+        };
+        particles.push({
+          id: `vend-${Date.now()}`,
+          x: 485,
+          y: 460,
+          text: '+$4 (Vending)',
+          color: '#38bdf8',
+          opacity: 1.0,
+          vy: -25,
+          life: 1.2,
+        });
+        vendingTimer = 30;
+      }
+    }
+
     const manager = staff.find((s) => s.type === 'manager');
     const managerHired = Boolean(manager && manager.hired && manager.active);
     const cashier = staff.find((s) => s.type === 'cashier');
-    const cashierMultiplier = getCashierSpeedMultiplier(cashier, managerHired, staffLoungeLevel);
+    const cashierMultiplier =
+      getCashierSpeedMultiplier(cashier, managerHired, staffLoungeLevel) + (hasEspresso ? 0.25 : 0);
 
+    // 1. Spawning customers
     spawnTimer -= effectiveDelta;
-    const maxCustomers = 4 + attractionLevel * 2;
+    const isRushHourActive = rushHourTimeRemaining > 0;
+    const rushMultiplier = isRushHourActive ? 2.5 : 1.0;
+    const maxCustomers = (4 + attractionLevel * 2) * (isRushHourActive ? 1.5 : 1.0);
+
     if (spawnTimer <= 0 && customers.length < maxCustomers) {
       const unlockedProducts = products.filter((p) => p.isUnlocked);
-      const newCustomer = spawnCustomer(unlockedProducts);
+      const vipBonusChance = hasNeon ? 0.15 : 0.0;
+      const newCustomer = spawnCustomer(unlockedProducts, vipBonusChance);
       if (newCustomer) {
         customers = [...customers, newCustomer];
       }
-      const spawnInterval = Math.max(1.2, 4.5 / (1 + attractionLevel * 0.25));
-      spawnTimer = spawnInterval + (Math.random() * 0.8 - 0.4);
+      const baseSpawnInterval = Math.max(1.0, 4.5 / (1 + attractionLevel * 0.25));
+      spawnTimer = (baseSpawnInterval / rushMultiplier) + (Math.random() * 0.5 - 0.25);
     }
 
+    // 2. Customer updates & completed sales
     const custUpdate = updateCustomers(
       customers,
       products,
       effectiveDelta,
       cashierMultiplier,
-      scannerBonus
+      scannerBonus,
+      hasMonstera,
+      hasLamps
     );
     customers = custUpdate.updatedCustomers;
 
@@ -210,8 +322,31 @@ export const useGameStore = create<GameState>((set, get) => ({
       for (const sale of custUpdate.result.completedSales) {
         const prod = products.find((p) => p.id === sale.productId);
         if (prod) {
-          const saleResult = applySaleToStats(stats, prod, 1, wholesaleLevel);
+          // Check if trending deal
+          const isTrending = dailyDeal.trendingProductId === prod.id;
+          const trendingBonus = isTrending ? 0.5 : 0;
+          const saleResult = applySaleToStats(stats, prod, 1, wholesaleLevel + trendingBonus);
           stats = saleResult.newStats;
+
+          // Tip Bonus from VIP or Espresso
+          const tip = (sale.tipBonus || 0) + (hasEspresso ? 2 : 0);
+          if (tip > 0) {
+            stats = {
+              ...stats,
+              cash: stats.cash + tip,
+              totalRevenue: stats.totalRevenue + tip,
+              netProfit: stats.netProfit + tip,
+              totalTipsEarned: (stats.totalTipsEarned || 0) + tip,
+            };
+          }
+
+          if (sale.isVip) {
+            stats = {
+              ...stats,
+              vipCustomersServed: (stats.vipCustomersServed || 0) + 1,
+            };
+          }
+
           progression = {
             ...progression,
             xp: progression.xp + Math.max(5, Math.floor(prod.salePrice * 1.5)),
@@ -232,6 +367,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       particles = [...particles, ...custUpdate.result.particles];
     }
 
+    // 3. Stocker Automation
     stockerTimer -= effectiveDelta;
     const stocker = staff.find((s) => s.type === 'stocker');
     if (stockerTimer <= 0 && stocker && stocker.hired && stocker.active) {
@@ -254,6 +390,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       stockerTimer = Math.max(1.5, 4.0 - stocker.level * 0.5);
     }
 
+    // 4. Staff Salary Cycle (every 60s)
     salaryTimer -= effectiveDelta;
     if (salaryTimer <= 0) {
       const salaryDue = calculateStaffSalaries(staff, 1.0);
@@ -269,6 +406,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       salaryTimer = 60;
     }
 
+    // 5. Progression: Check Level Up
     const lvlCheck = checkLevelUp(progression, stats);
     if (lvlCheck.levelUpResult.leveledUp) {
       progression = lvlCheck.updatedProgression;
@@ -290,6 +428,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       ];
     }
 
+    // 6. Achievements Check
     const achCheck = evaluateAchievements(achievements, stats, progression, staff);
     if (achCheck.newlyUnlocked.length > 0) {
       achievements = achCheck.updatedAchievements;
@@ -308,7 +447,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           id: `ach-${ach.id}-${Date.now()}`,
           x: 400,
           y: 250,
-          text: `🏆 Achievement: ${ach.title}! (+$${ach.rewardCash})`,
+          text: `🏆 Milestone: ${ach.title}! (+$${ach.rewardCash})`,
           color: '#38bdf8',
           opacity: 1.0,
           vy: -30,
@@ -317,6 +456,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
     }
 
+    // 7. Update Particles
     const updatedParticles: FloatingParticle[] = [];
     for (const p of particles) {
       const newLife = p.life - effectiveDelta;
@@ -330,6 +470,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
     }
 
+    // 8. Auto-save periodically
     if (Math.floor(gameTime) % 8 === 0 && Math.floor(gameTime - effectiveDelta) % 8 !== 0) {
       saveGame({
         stats,
@@ -338,6 +479,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         staff,
         upgrades,
         achievements,
+        decorations,
         hasCompletedTutorial: state.hasCompletedTutorial,
       });
     }
@@ -349,21 +491,32 @@ export const useGameStore = create<GameState>((set, get) => ({
       staff,
       upgrades,
       achievements,
+      decorations,
       customers,
       particles: updatedParticles,
+      dailyDeal,
+      rushHourTimeRemaining,
+      rushHourCooldown,
       salaryTimer,
       stockerTimer,
+      vendingTimer,
       spawnTimer,
       gameTime,
     });
   },
 
   buyProductStock: (productId: ProductId, amount: number) => {
-    const { stats, products, tutorialStep } = get();
+    const { stats, products, tutorialStep, dailyDeal } = get();
     const product = products.find((p) => p.id === productId);
     if (!product) return false;
 
-    const res = buyStock(stats.cash, product, amount);
+    // Daily discount on cost price (-40%)
+    const isDiscounted = dailyDeal.discountedProductId === productId;
+    const effectiveProd = isDiscounted
+      ? { ...product, costPrice: Math.max(1, Math.round(product.costPrice * 0.6)) }
+      : product;
+
+    const res = buyStock(stats.cash, effectiveProd, amount);
     if (!res.success) return false;
 
     const updatedProducts = products.map((p) =>
@@ -508,6 +661,72 @@ export const useGameStore = create<GameState>((set, get) => ({
     return true;
   },
 
+  buyDecoration: (decorationId: string) => {
+    const { stats, decorations, progression, particles } = get();
+    const dec = decorations.find((d) => d.id === decorationId);
+    if (!dec || dec.isPurchased) return false;
+    if (progression.level < dec.reqLevel) return false;
+    if (stats.cash < dec.cost) return false;
+
+    const updatedDecorations = decorations.map((d) =>
+      d.id === decorationId ? { ...d, isPurchased: true } : d
+    );
+
+    soundManager.playUpgrade();
+    confetti({ particleCount: 50, spread: 60 });
+
+    set({
+      stats: {
+        ...stats,
+        cash: stats.cash - dec.cost,
+      },
+      decorations: updatedDecorations,
+      particles: [
+        ...particles,
+        {
+          id: `dec-${Date.now()}`,
+          x: dec.x,
+          y: dec.y - 20,
+          text: `✨ ${dec.name} Installed!`,
+          color: '#ec4899',
+          opacity: 1.0,
+          vy: -35,
+          life: 2.0,
+        },
+      ],
+    });
+
+    return true;
+  },
+
+  activateRushHour: () => {
+    const { rushHourTimeRemaining, rushHourCooldown, particles } = get();
+    if (rushHourTimeRemaining > 0 || rushHourCooldown > 0) return false;
+
+    soundManager.playLevelUp();
+    confetti({ particleCount: 75, spread: 70 });
+
+    set({
+      rushHourTimeRemaining: 30, // 30 seconds of high traffic
+      rushHourCooldown: 90,     // 90 seconds cooldown
+      particles: [
+        ...particles,
+        {
+          id: `rush-${Date.now()}`,
+          x: 400,
+          y: 200,
+          text: '🔥 RUSH HOUR PROMO ACTIVATED! (3x Foot Traffic)',
+          color: '#ef4444',
+          opacity: 1.0,
+          vy: -40,
+          life: 2.5,
+        },
+      ],
+    });
+
+    return true;
+  },
+
   manualRegisterClick: () => {
     const { customers, particles } = get();
     const payingCustomer = customers.find((c) => c.state === 'PAYING');
@@ -595,16 +814,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       staff: INITIAL_STAFF.map((s) => ({ ...s })),
       upgrades: INITIAL_UPGRADES.map((u) => ({ ...u })),
       achievements: INITIAL_ACHIEVEMENTS.map((a) => ({ ...a })),
+      decorations: INITIAL_DECORATIONS.map((d) => ({ ...d })),
       customers: [],
       particles: [],
       tutorialStep: 0,
       hasCompletedTutorial: false,
       offlineSummary: null,
+      rushHourTimeRemaining: 0,
+      rushHourCooldown: 0,
     });
   },
 
   exportSaveData: () => {
-    const { stats, progression, products, staff, upgrades, achievements, hasCompletedTutorial } =
+    const { stats, progression, products, staff, upgrades, achievements, decorations, hasCompletedTutorial } =
       get();
     return exportSaveString({
       version: 1,
@@ -615,6 +837,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       staff,
       upgrades,
       achievements,
+      decorations,
       hasCompletedTutorial,
     });
   },
@@ -630,6 +853,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       staff: imported.staff,
       upgrades: imported.upgrades,
       achievements: imported.achievements,
+      decorations: imported.decorations || INITIAL_DECORATIONS,
       hasCompletedTutorial: imported.hasCompletedTutorial,
       tutorialStep: imported.hasCompletedTutorial ? 4 : 0,
     });
